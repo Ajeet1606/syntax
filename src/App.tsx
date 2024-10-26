@@ -1,10 +1,13 @@
 import "./App.css";
 import Home from "./pages/Home";
+import { ThemeProvider } from "./components/custom/ThemeProvider";
 
 function App() {
   return (
     <>
-      <Home />
+      <ThemeProvider defaultTheme="light" storageKey="vite-ui-theme">
+        <Home />
+      </ThemeProvider>
     </>
   );
 }
