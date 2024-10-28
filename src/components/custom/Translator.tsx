@@ -11,7 +11,8 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import { ThemeToggle } from "./ThemeToggle";
 import { useToast } from "@/hooks/use-toast";
-import { Copy, Check } from "lucide-react";
+import { Copy, Check, Loader2 } from "lucide-react";
+import { languagesList } from "@/utils";
 
 const Translator = () => {
   const [inputLang, setInputLang] = useState("javascript");
@@ -20,6 +21,7 @@ const Translator = () => {
   const [outputCode, setOutputCode] = useState("");
   const [mounted, setMounted] = useState(false);
   const [isCopied, setIsCopied] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -53,63 +55,39 @@ const Translator = () => {
         variant: "destructive",
       });
     }
-    const GEMINI_API_KEY = import.meta.env.VITE_GEMINI_API_KEY;
 
-    const prompt = `Translate the following code snippet to the specified target programming language.
-                
-    Instructions:
-    1. Add any required imports or headers for the target language (e.g., in C++ use #include <bits/stdc++.h> or other necessary headers).
-    2. Use concise, clean comments only where necessary to enhance understanding—avoid long explanations.
-    3. Follow clean code principles to ensure readability and maintainability in the translated code.
-    4. Optimize for best practices in the target language where appropriate.
-    5. Add proper error handlings.
-    Current Language: ${inputLang}
-    Target Language: ${outputLang}
-    Code Snippet to Translate: ${inputCode}
-    `;
-    fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY}`,
-      {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          contents: [
-            {
-              parts: [
-                {
-                  text: prompt,
-                },
-              ],
-            },
-          ],
-          safetySettings: [
-            {
-              category: "HARM_CATEGORY_DANGEROUS_CONTENT",
-              threshold: "BLOCK_ONLY_HIGH",
-            },
-          ],
-          generationConfig: {
-            stopSequences: ["Title"],
-            temperature: 1.0,
-            maxOutputTokens: 800,
-            topP: 0.8,
-            topK: 10,
-          },
-        }),
-      }
-    )
+    setIsLoading(true);
+    setOutputCode("");
+    fetch(`http://localhost:8000/api/v1/translation/`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        inputCode,
+        inputLang,
+        outputLang,
+      }),
+    })
       .then((response) => response.json())
       .then((data) => {
-        const output = data.candidates[0].content.parts[0].text;
-        // Remove the backticks and any additional line breaks
-        const cleanText = output.replace(/```(?:\w+)?\n?|```$/g, "").trim();
-        setOutputCode(cleanText);
+        console.log(data);
+        setOutputCode(data.output);
       })
       .catch((error) => {
         console.error("Error:", error);
-      });
+      })
+      .finally(() => setIsLoading(false));
+  };
+
+  const handleLanguageChange = (language: string, field: string) => {
+    if (field === "input") {
+      setInputLang(language);
+      setInputCode("");
+    } else {
+      setOutputLang(language);
+      setOutputCode("");
+    }
   };
 
   if (!mounted) return null;
@@ -133,15 +111,19 @@ const Translator = () => {
               <CardTitle>Input Code</CardTitle>
             </CardHeader>
             <CardContent>
-              <Select value={inputLang} onValueChange={setInputLang}>
+              <Select
+                value={inputLang}
+                onValueChange={(e) => handleLanguageChange(e, "input")}
+              >
                 <SelectTrigger>
                   <SelectValue placeholder="Select input language" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="javascript">JavaScript</SelectItem>
-                  <SelectItem value="python">Python</SelectItem>
-                  <SelectItem value="java">Java</SelectItem>
-                  <SelectItem value="cpp">C++</SelectItem>
+                  {languagesList.map((cur) => (
+                    <SelectItem value={cur.key} key={cur.key}>
+                      {cur.label}
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
               <Textarea
@@ -153,8 +135,21 @@ const Translator = () => {
             </CardContent>
           </Card>
           <div className="md:hidden flex justify-center">
-            <Button size="lg" onClick={translateCode}>
-              Translate
+            <Button
+              size="lg"
+              onClick={translateCode}
+              className="dark:text-white bg-transparent"
+              variant="outline"
+              disabled={isLoading}
+            >
+              {isLoading ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Translating...
+                </>
+              ) : (
+                "Translate"
+              )}
             </Button>
           </div>
           <Card>
@@ -174,15 +169,19 @@ const Translator = () => {
               </Button>
             </CardHeader>
             <CardContent>
-              <Select value={outputLang} onValueChange={setOutputLang}>
+              <Select
+                value={outputLang}
+                onValueChange={(e) => handleLanguageChange(e, "output")}
+              >
                 <SelectTrigger>
                   <SelectValue placeholder="Select output language" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="javascript">JavaScript</SelectItem>
-                  <SelectItem value="python">Python</SelectItem>
-                  <SelectItem value="java">Java</SelectItem>
-                  <SelectItem value="cpp">C++</SelectItem>
+                  {languagesList.map((cur) => (
+                    <SelectItem value={cur.key} key={cur.key}>
+                      {cur.label}
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
               <Textarea
@@ -196,8 +195,21 @@ const Translator = () => {
         </div>
 
         <div className="hidden mt-6 md:flex justify-center">
-          <Button size="lg" onClick={translateCode}>
-            Translate
+          <Button
+            size="lg"
+            onClick={translateCode}
+            className="dark:text-white bg-transparent"
+            variant="outline"
+            disabled={isLoading}
+          >
+            {isLoading ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                Translating...
+              </>
+            ) : (
+              "Translate"
+            )}
           </Button>
         </div>
       </main>
